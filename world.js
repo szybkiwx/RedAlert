@@ -23,45 +23,39 @@ config = {
 }
 */
 
-RedAlert.Sector = RedAlert.Sector || function(config) {
-	var pane = RedAlert.Pane();
-	var Point = function(px, py) {
-		this.x = px;
-		this.y = py;
+var Point = function(px, py) {
+	this.x = px;
+	this.y = py;
+	
+	this.getDistance = function(p2) {
+		var dx = p2.x - this.x;
+		var dy = p2.y - this.y;
 		
-		this.getDistance = function(p2) {
-			var dx = p2.x - this.x;
-			var dy = p2.y - this.y;
-			
-			return Math.abs(dx * dx + dy * dy);
-		};
-		
-		this.equals = function(p2) {
-			return this.x == p2.x && this.y == p2.y;
-		};
+		return Math.abs(dx * dx + dy * dy);
 	};
+	
+	this.equals = function(p2) {
+		return this.x == p2.x && this.y == p2.y;
+	};
+};
 
+
+RedAlert.Layout = RedAlert.Layout || function(gridSize, baconsQuantity, inSide, outSides) {
+	var sides = {
+		LEFT: new Point(0, gridSize.y / 2), 
+		BOTTOM: new Point(gridSize.x / 2, gridSize.y),
+		RIGHT: new Point(gridSize.x, gridSize.y / 2),
+		TOP: new Point(gridSize.x / 2, 0 )
+	}
+	
 	var bacons = [];
 	
-	var sides = {
-		LEFT: new Point(0, config.gridSize.y / 2), 
-		BOTTOM: new Point(config.gridSize.x / 2, config.gridSize.y),
-		RIGHT: new Point(config.gridSize.x, config.gridSize.y / 2),
-		TOP: new Point(config.gridSize.x / 2, 0 )
-	}
-
 	var entryBacon = new Point(0, 0);
 	var outBacons = {};
-	for(var i = 0; i < config.out.length; i++) {
-		outBacons[config.out[i]] = new Point(0, 0);
+	for(var i = 0; i < outSides.length; i++) {
+		outBacons[outSides[i]] = new Point(0, 0);
 	}
-
-	var baconLimits = config.baconLimits;
 	
-	var gridSize = config.gridSize;
-	
-	var baconsQuantity = Math.floor(Math.random() * (baconLimits[1] - baconLimits[0]) + baconLimits[0]); 
-
 	for(var i = 0; i < baconsQuantity; i++) {
 		var newPoint = new Point(
 			Math.floor(Math.random() * gridSize.x),
@@ -69,7 +63,7 @@ RedAlert.Sector = RedAlert.Sector || function(config) {
 		);
 		bacons.push(newPoint);
 		
-		if( newPoint.getDistance(sides[config.in]) < entryBacon.getDistance(sides[config.in]) ) {
+		if( newPoint.getDistance(sides[inSide]) < entryBacon.getDistance(sides[inSide]) ) {
 			entryBacon = newPoint;
 		}
 		
@@ -80,7 +74,24 @@ RedAlert.Sector = RedAlert.Sector || function(config) {
 			}
 		}
 		
+	}
+	return {
+		bacons: bacons,
+		entryBacon: entryBacon,
+		outBacons: outBacons
 	};
+}
+
+RedAlert.Sector = RedAlert.Sector || function(config) {
+	var pane = RedAlert.Pane();
+	
+	var baconLimits = config.baconLimits;
+	
+	var gridSize = config.gridSize;
+	
+	var baconsQuantity = Math.floor(Math.random() * (baconLimits[1] - baconLimits[0]) + baconLimits[0]); 
+
+	var layout = RedAlert.Layout(gridSize, baconsQuantity, config.in, config.out);
 	
 	var drawBacon = function(bacon, radius, fillStyle) {
 		var ctx = pane.context();
@@ -93,17 +104,17 @@ RedAlert.Sector = RedAlert.Sector || function(config) {
 	};
 	
 	var draw = function() {
-		for(var baconIdx in bacons) {
-			var bacon = bacons[baconIdx];
+		for(var baconIdx in layout.bacons) {
+			var bacon = layout.bacons[baconIdx];
 			
 			drawBacon(bacon, 2);
 			
-			if(entryBacon.equals(bacon)) {
+			if(layout.entryBacon.equals(bacon)) {
 				drawBacon(bacon, 5, "#f00");
 			}
 			
-			for(var idx in outBacons) {
-				var outBacon = outBacons[idx];
+			for(var idx in layout.outBacons) {
+				var outBacon = layout.outBacons[idx];
 				if(outBacon.equals(bacon)) {
 					drawBacon( bacon, 7, "#00f");
 				}
