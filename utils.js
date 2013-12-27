@@ -1,4 +1,15 @@
-/* Recipe from JavaSCript Allonge */
+// shim layer with setTimeout fallback
+window.requestAnimFrame = (function(){
+  return  window.requestAnimationFrame       ||
+          window.webkitRequestAnimationFrame ||
+          window.mozRequestAnimationFrame    ||
+          function( callback ){
+            window.setTimeout(callback, 1000 / 60);
+          };
+})();
+
+
+/* Recipe from JavaScript Allonge */
 var __slice = Array.prototype.slice;
 
 function variadic (fn) {

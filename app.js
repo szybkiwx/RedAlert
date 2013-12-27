@@ -1,3 +1,5 @@
+
+
 resources.load([
 	'images/ship/crate.png',
 	'images/ship/engine.png',
@@ -8,22 +10,10 @@ resources.load([
 ])
 
 resources.onReady(function() {
-	var ship = RedAlert.Ship();
-	ship.init();
-	ship.draw();
+	var battle = RedAlert.Battle();
+	battle.init();
 });
 
 
 
 
-var lastTime;
-function main() {
-    var now = Date.now();
-    var dt = (now - lastTime) / 1000.0;
-
-    update(dt);
-    render();
-
-    lastTime = now;
-    requestAnimFrame(main);
-};
