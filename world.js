@@ -6,9 +6,12 @@ RedAlert.Pane = RedAlert.Pane || function() {
 		canvasSize: function() {
 			var canvas =  document.getElementById('gameWindow');
 			return { width: canvas.width, height: canvas.height };
-		},	
+		},
+		canvas: function() {
+			return document.getElementById('gameWindow');
+		},
 		context: function() {
-			return document.getElementById('gameWindow').getContext("2d");
+			return this.canvas().getContext("2d");
 		},
 		draw: draw
 	};
