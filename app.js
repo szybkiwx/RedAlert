@@ -9,6 +9,8 @@ resources.load([
 	'images/ship/weapon.png',
 	'images/ship/hangar.png',
 	'images/ship/door.png',
+	'images/ship/crosshair.png',
+	'images/ship/laserbullet.png'
 ])
 
 resources.onReady(function() {
@@ -17,6 +19,26 @@ resources.onReady(function() {
 	battle.main();
 });
 
+
+Queue = function() {
+	var array = [],
+		head = 0,
+		tail = -1;
+	return {
+		push: function(element) {
+			array[++tail] = element;
+		},
+		pull: function() {
+			var element = array[head];
+			array[head] = void 0;
+			head++;
+			return element;
+		},
+		isEmpty: function() {
+			return tail < head;
+		}
+	}
+};
 
 RedAlert.ClickHandlers = function() {
 	var pane = RedAlert.Pane();

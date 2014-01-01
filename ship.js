@@ -1,25 +1,40 @@
-RedAlert.Weapon = function(powerConsumption, powerUpTime, damage, label) {
+RedAlert.Weapon = function(ship, powerConsumption, powerUpTime, damage, label) {
+
+	this.ship = ship;
 	this.powerConsumption = powerConsumption;
 	this.powerUpTime = powerUpTime;
 	this.damage = damage;
 	this.label = label;
 	this.powerUp = 0;
 	this.selected = false;
+	this.target = null;
+	this.sprite = null;
+	this.spriteImg = '';
+	radio('weaponcharged').subscribe(this.fire);
+	
+	this.fire = function() {
+		var sprite = new Sprite(this.spriteImg, [this.ship.weaponPosition.x, this.ship.weaponPosition.y], 12, 10, [0]);
+		var self = this;
+		radio.subscribe('shotfinished', function() {
+			self.target = null;
+		});
+	};
 	
 	this.isPowered = function() {
 		return this.powerUp === this.powerUpTime;
 	};
 }
 
-RedAlert.LaserWeapon = function(powerConsumption, powerUpTime, damage, label) {
-	RedAlert.Weapon.call(this, powerConsumption, powerUpTime, damage, label);
+RedAlert.LaserWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
+	this.spriteImg = 'images/ship/laserbullet.png';
+	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
 }
 
 RedAlert.LaserWeapon.prototype = RedAlert.Weapon;
 RedAlert.LaserWeapon.prototype.constructor = RedAlert.LaserWeapon;
 
-RedAlert.MissileWeapon = function(powerConsumption, powerUpTime, damage, label) {
-	RedAlert.Weapon.call(this, powerConsumption, powerUpTime, damage, label);
+RedAlert.MissileWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
+	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
 }
 
 RedAlert.MissileWeapon.prototype = RedAlert.Weapon;
@@ -59,6 +74,7 @@ RedAlert.ShipBackground = function() {
 	};
 }
 
+
 RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 	var pane = RedAlert.Pane();
 	
@@ -72,6 +88,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 	var orientation = inOrientation;
 	
 	var handlers = inHandlers;
+	
+	var activeWeapon = null;
 	
 	function getImage(name) {
 		var image = resources.get('images/ship/'+name + '.png');
@@ -89,46 +107,68 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		'd' : { img:getImage('door')}
 	};
 	
-	
-	var Tile = function(/*Point*/position, symbol){
+	var Tile = function(ship, /*Point*/position, symbol){
 		this.position = position;
 		this.symbol = symbol;
+		this.ship = ship;
+		var finalPosition = this.getPosition();
+		var self = this;
 		
-		this.getPosition = function() {
-			return { 
-				x: (orientation == 0 ? this.position.x : this.position.y) + drawingOffset.x,
-				y: (orientation == 0 ? this.position.y : this.position.x) + drawingOffset.y,
-				sizex: orientation == 0 ? tileSize.x : tileSize.y,
-				sizey: orientation == 0 ? tileSize.y : tileSize.x
-			};
-		};
-		
-		this.draw = function() {
-			var context = pane.context();
-			var finalPosition = this.getPosition();
-			
-			
-			context.beginPath();
-			
-			context.rect(finalPosition.x, finalPosition.y, finalPosition.sizex - 2, finalPosition.sizey - 2);
-			context.fillStyle = '#D8D8D8';
-			context.fill();
-			context.strokeStyle = '#9E9E9E';
-			context.lineWidth = 1;
-			//context.stroke();
-			
-			context.fillStyle = '#6E6E6E';
-			context.font = '24px Calibri';
-			if(symbol in tileConfigs) {
-				context.drawImage(tileConfigs[symbol].img, finalPosition.x + 5, finalPosition.y + 5);
+		handlers.registerRect(finalPosition.x, finalPosition.y, finalPosition.sizex, finalPosition.sizey, function(x, y) {
+			if(self.ship.orientation === 1) {
+				radio('tileclicked').broadcast(x, y);
 			}
-		}
+		});
+	};
+
+	Tile.prototype.getPosition = function() {
+		return { 
+			x: (this.ship.orientation == 0 ? this.position.x : this.position.y) + drawingOffset.x,
+			y: (this.ship.orientation == 0 ? this.position.y : this.position.x) + drawingOffset.y,
+			sizex: this.ship.orientation == 0 ? tileSize.x : tileSize.y,
+			sizey: this.ship.orientation == 0 ? tileSize.y : tileSize.x
+		};
 	};
 	
+	Tile.prototype.draw = function() {
+		var context = pane.context();
+		var finalPosition = this.getPosition();
+		
+		context.beginPath();
+		
+		context.rect(finalPosition.x, finalPosition.y, finalPosition.sizex - 2, finalPosition.sizey - 2);
+		context.fillStyle = '#D8D8D8';
+		context.fill();
+		context.strokeStyle = '#9E9E9E';
+		context.lineWidth = 1;
+		//context.stroke();
+		
+		context.fillStyle = '#6E6E6E';
+		context.font = '24px Calibri';
+		if(this.symbol in tileConfigs) {
+			context.drawImage(tileConfigs[this.symbol].img, finalPosition.x + 5, finalPosition.y + 5);
+		}
+	
+		if(this.ship.orientation === 1) {
+			for(var i = 0; i < this.ship.crosshairs.length; i++) {
+				var crosshair = this.ship.crosshairs[i];
+				if(crosshair !== null && crosshair.x >= finalPosition.x && crosshair.x < finalPosition.x + finalPosition.sizex 
+					&& crosshair.y >= finalPosition.y && crosshair.y < finalPosition.y + finalPosition.sizey ) {
+					pane.context().drawImage(resources.get('images/ship/crosshair.png'), finalPosition.x, finalPosition.y)
+				}				
+			}
+		}
+	}
+
 	var tiles = [];
 	var context = document.getElementById('gameWindow').getContext("2d");
 	
 	var weaponSlots = [null, null, null, null];
+	
+	var crosshairs = [null, null, null, null];
+	
+	//tile which serves as bullet starting point
+	var weaponPosition = null;
 	
 	var init = function(newLayout, weapons) {
 		layout = newLayout;
@@ -137,7 +177,10 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		for(var i = 0; i < weapons.length; i++) {
 			weaponSlots[i] = weapons[i];
 			if(orientation === 0) {
-				handlers.registerRect(left, top, weaponSlotSize.x, weaponSlotSize.y, selectWeapon);
+				handlers.registerRect(left, top, weaponSlotSize.x, weaponSlotSize.y, function(x, y) {
+					radio('weaponslotclicked').broadcast(x, y);
+	
+				});
 				left += weaponSlotSize.x;
 			}
 		}
@@ -145,12 +188,34 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		for(var i = 0; i < layout.length; i ++) {
 			for(var j = 0; j < layout[i].length; j++) {
 				if(layout[i][j] != 'x') {
-					tiles.push(new Tile(new RedAlert.Point(j * tileSize.x, i * tileSize.y), layout[i][j], ''));
+					var tile = new Tile(this, new RedAlert.Point(j * tileSize.x, i * tileSize.y), layout[i][j], orientation);
+					tiles.push(tile);
+					if(layout[i][j] == 't') {
+						weaponPosition = tile; 
+					}
 				}
 			}
 		}
 		
 	};
+	
+	var lockTarget = function(x, y) {
+		var p = {x: x, y: y};
+		this.activeWeapon.target = p;
+	};
+	
+	var setCrosshair = function(x, y, friendShip) {
+		var weaponSlots = friendShip.activeWeaponSlots();
+		
+		var p = {x: x, y: y};
+		for(var i = 0; i < weaponSlots.length; i++) {
+			var slot = weaponSlots[i];
+			if(slot.selected) {
+				this.crosshairs[i] = p;
+			}
+						
+		}
+	}
 	
 	var drawWeaponSlot = function(top, left) {
 		var context = pane.context();
@@ -163,20 +228,24 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		context.stroke();
 	}
 	
-	var selectWeapon = function(clickX, clickY) {
-		var weapons = activeWeaponSlots();
-		var y = pane.canvasSize().height - drawingOffset.y;
-		var x = drawingOffset.x;
+	var onWeaponSlotClicked = function(clickX, clickY) {
+
+		var weapons = this.activeWeaponSlots();
+		var y = this.canvasSize().height - this.drawingOffset.y;
+		var x = this.drawingOffset.x;
 		
 		for(var i = 0; i < weapons.length; i++) {
 			var weapon = weapons[i];
-			if(clickX >= x && clickX < x + weaponSlotSize.x && clickY >= y && clickY < y + weaponSlotSize.y){
+			if(clickX >= x && clickX < x + this.weaponSlotSize.x && clickY >= y && clickY < y + this.weaponSlotSize.y){
 				weapon.selected = true;
-				pane.canvas().style.cursor = "url('images/ship/crosshair.png'), auto";
-				break;
+				this.activeWeapon = weapon;
+				this.canvas().style.cursor = "url('images/ship/crosshair.png'), auto";
 			}
-			
-			x += i * weaponSlotSize.x;
+			else {
+				weapon.selected = false;
+				//pane.canvas().style.cursor = "pointer";
+			}
+			x += weaponSlotSize.x;
 		}
 		
 	};
@@ -224,8 +293,6 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			context.lineWidth = 2;
 			context.rect(left, top, weaponSlotSize.x - 1, weaponSlotSize.y);
 			context.stroke();
-			
-			
 		}
 		
 	};
@@ -241,14 +308,23 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			weapon.powerUp += dt;
 			if(weapon.powerUp >= weapon.powerUpTime) {
 				weapon.powerUp = weapon.powerUpTime;
+				radio('weaponcharged').broadcast(weapon);
 			}			
 		}
 	};
+	
+	var getWeaponSlotLocation = function(slotIndex) {
+		var top = pane.canvasSize().height - drawingOffset.y;
+		var left = drawingOffset.x
+		
+		return {x: top, y: left + slotIndex * weaponSlotSize.x};
+	}
 	
 	var draw = function() {
 		for(var i = 0; i < tiles.length; i++) {
 			var tile = tiles[i];
 			tile.draw();
+			
 		}
 		
 		//draw module walls
@@ -273,11 +349,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 				context.rect(position.x, position.y, scalex * position.sizex - 3, scaley * position.sizey - 3);
 				context.stroke()
 			}
-			
 		}
-		
-		var top = pane.canvasSize().height - drawingOffset.y;
-		var left = drawingOffset.x;
 		
 		if (orientation === 0) {
 			var maxWeaponPowerBar = weaponSlots.reduce(function(lastValue, current) { 
@@ -288,10 +360,12 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			}, 0);
 			
 			for(var i  = 0; i < weaponSlots.length; i++) {
-				drawWeaponSlot(top, left + i * weaponSlotSize.x );
+				var pos = getWeaponSlotLocation(i);
+				drawWeaponSlot(pos.x, pos.y );
 				var weapon = weaponSlots[i];
 				if(weapon != null) {
-					drawWeapon(weapon, maxWeaponPowerBar, top, left + i * weaponSlotSize.x);
+					
+					drawWeapon(weapon, maxWeaponPowerBar, pos.x, pos.y);
 				}
 			}
 		}
@@ -302,25 +376,23 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		setWeaponLabel: setWeaponLabel,
 		drawWeapon: drawWeapon,
 		activeWeaponSlots: activeWeaponSlots,
+		weaponPosition: weaponPosition,
+		crosshairs: crosshairs,
+		orientation: orientation,
+		drawingOffset: drawingOffset,
+		weaponSlotSize:weaponSlotSize,
+		activeWeapon: activeWeapon,
 		
 		draw: draw,
 		init: init,
-		update: update
-
+		update: update,
+		onWeaponSlotClicked: onWeaponSlotClicked,
+		lockTarget: lockTarget,
+		setCrosshair: setCrosshair,
+		getWeaponSlotLocation: getWeaponSlotLocation
 	});	
 };
 
-/*RedAlert.EnemyShip = function() {
-	var ship = RedAlert.Ship();
-	
-	var tileSize = {x:50, y:35};
-	var drawingOffset = {x: 50, y: 150};
-	
-	var orientation = 1;	
-	
-	return extend(ship, {
-	});
-};*/
 
 RedAlert.Battle = function() {
 	var lastTime;
@@ -336,38 +408,45 @@ RedAlert.Battle = function() {
 		var background = RedAlert.ShipBackground();
 		background.draw();
 		var playerLayout = [
-			'xxxddxxx',
+			'xxxddxxt',
 			'dh w----',
 			'd  eq---p',
 			'dc sl---p',
 			'd  -----',
-			'xxxddxxx'
+			'xxxddxxt'
 		];
-		var playerWeapons = [new RedAlert.MissileWeapon(1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(2, 13, 3, 'Light Laser Cannon')];
+		var playerWeapons = [new RedAlert.MissileWeapon(playerShip, 1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(playerShip, 2, 13, 3, 'Light Laser Cannon')];
 		
 		playerShip.init(playerLayout, playerWeapons);
 		playerShip.draw();
 		
 		var enemyLayout = [
-			'xxxddxxx',
+			'xxxddxxt',
 			'dh w----',
 			'd  eq---p',
 			'dc sl---p',
 			'd  -----',
-			'xxxddxxx'
+			'xxxddxxt'
 		];
-		var enemyWeapons = [new RedAlert.MissileWeapon(1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(2, 13, 3, 'Light Laser Cannon')];
+		var enemyWeapons = [new RedAlert.MissileWeapon(enemyShip, 1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(enemyShip, 2, 13, 3, 'Light Laser Cannon')];
 		
 		enemyShip.init(enemyLayout, enemyWeapons);
 		enemyShip.draw();
+		
+		radio('weaponslotclicked').subscribe([playerShip.onWeaponSlotClicked, playerShip]);
+		radio('tileclicked').subscribe([playerShip.lockTarget, playerShip]);
+		radio('tileclicked').subscribe([function(x, y) { enemyShip.setCrosshair(x, y, playerShip)}, enemyShip]);
+		
 	};
 	
 	var update = function(dt) {
 		playerShip.update(dt);
+		enemyShip.update(dt);
 	}
 	
 	var render = function() {
 		playerShip.draw();
+		enemyShip.draw();
 	};
 	
 	var main = function() {
@@ -383,7 +462,8 @@ RedAlert.Battle = function() {
 	
 	return {
 		init: init, 
-		main: main
+		main: main,
+		handlers: handlers
 	}
 };
 
