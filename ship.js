@@ -10,11 +10,10 @@ RedAlert.Weapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	this.target = null;
 	this.sprite = null;
 	this.spriteImg = '';
-	
 }
 
 RedAlert.Weapon.prototype.fire = function() {
-	this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], 12, 10, [0]);
+	this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], [12, 12], 10, [0]);
 	var self = this;
 	radio('shotfinished').subscribe(function() {
 		self.target = null;
@@ -32,9 +31,57 @@ RedAlert.Weapon.prototype.update = function(dt) {
 		else if(this.powerUp + dt < this.powerUpTime){
 			this.powerUp += dt;
 		}
-}
+	}
+	
 	if(this.sprite != null) {
 		this.sprite.update(dt);
+	}
+}
+
+RedAlert.Weapon.prototype.draw = function(barMax, top, left) {
+	var barHeight = this.powerUpTime / barMax; 
+	var context = this.ship.context();
+	var style = this.isPowered() ? '#0f0' : '#fff';
+	
+	context.beginPath();
+	context.strokeStyle = style;
+	context.lineWidth = 2;
+	context.rect(left, top + (this.ship.weaponSlotSize.y * (1 - barHeight)), 5, barHeight * this.ship.weaponSlotSize.y);
+	context.stroke();
+	
+	barHeight = this.powerUp / barMax;
+	
+	context.beginPath();
+	context.fillStyle = style;
+	context.rect(left, top + (this.ship.weaponSlotSize.y * (1 - barHeight)), 5, barHeight * this.ship.weaponSlotSize.y);
+	context.fill();
+	
+	this.setWeaponLabel(top, left, this.label, 10);
+	
+	if(this.selected) {
+		context.beginPath();
+		context.strokeStyle = 'orange';
+		context.lineWidth = 2;
+		context.rect(left, top, this.ship.weaponSlotSize.x - 1, this.ship.weaponSlotSize.y);
+		context.stroke();
+	}
+
+	if(this.sprite != null) {
+		this.sprite.render();
+	}
+}
+
+RedAlert.Weapon.prototype.setWeaponLabel = function(top, left, label) {
+	var lines = label.split(' ');
+	var x = left + 20, y = top + 15;
+	var ctx = this.ship.context();
+	ctx.font = '14px Calibri bold';
+	ctx.strokeStyle = '#000';
+	ctx.lineWidth = 0.5;
+	for(var i = 0; i < lines.length; i++) {
+		var line = lines[i];
+		ctx.fillText(line, x, y);
+		y += 15;
 	}
 };
 
@@ -218,7 +265,9 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			}
 		}
 		radio('weaponcharged').subscribe(function(weapon) {
-			weapon.fire();
+			if(weapon.target != null) {
+				weapon.fire();
+			}
 		});
 	};
 	
@@ -226,7 +275,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		var p = {x: x, y: y};
 		this.activeWeapon.target = p;
 		if(this.activeWeapon.isPowered()) {
-			radio('weaponcharged').broadcast(this.activeWeapon);
+			this.activeWeapon.fire();
 		}
 	};
 	
@@ -278,7 +327,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		
 	};
 	
-	var setWeaponLabel = function(top, left, label) {
+	/*var setWeaponLabel = function(top, left, label) {
 		
 		var lines = label.split(' ');
 		var x = left + 20, y = top + 15;
@@ -293,9 +342,9 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			y += 15;
 		}
 
-	};
+	};*/
 	
-	var drawWeapon = function(weapon, barMax, top, left) {
+	/*var drawWeapon = function(weapon, barMax, top, left) {
 		var barHeight = weapon.powerUpTime / barMax; 
 		var context = pane.context();
 		var style = weapon.isPowered() ? '#0f0' : '#fff';
@@ -323,7 +372,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			context.stroke();
 		}
 		
-	};
+	};*/
 	
 	var activeWeaponSlots = function() {
 		return weaponSlots.filter(function(val) {return val != null;});
@@ -388,21 +437,19 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 				drawWeaponSlot(pos.x, pos.y );
 				var weapon = weaponSlots[i];
 				if(weapon != null) {
-					
-					drawWeapon(weapon, maxWeaponPowerBar, pos.x, pos.y);
+					weapon.draw(maxWeaponPowerBar, pos.x, pos.y);
 				}
 			}
 		}
 	};
 	
 	var getWeaponPosition = function() {
-		return weaponPosition;
+		return weaponPosition.position;
 	};
 	
 	return extend(pane, {
-		drawWeapon: drawWeapon,
-		setWeaponLabel: setWeaponLabel,
-		drawWeapon: drawWeapon,
+		//drawWeapon: drawWeapon,
+		//setWeaponLabel: setWeaponLabel,
 		activeWeaponSlots: activeWeaponSlots,
 		weaponPosition: weaponPosition,
 		crosshairs: crosshairs,
