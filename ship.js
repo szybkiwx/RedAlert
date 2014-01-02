@@ -10,34 +10,53 @@ RedAlert.Weapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	this.target = null;
 	this.sprite = null;
 	this.spriteImg = '';
-	radio('weaponcharged').subscribe(this.fire);
 	
-	this.fire = function() {
-		var sprite = new Sprite(this.spriteImg, [this.ship.weaponPosition.x, this.ship.weaponPosition.y], 12, 10, [0]);
-		var self = this;
-		radio.subscribe('shotfinished', function() {
-			self.target = null;
-		});
-	};
-	
-	this.isPowered = function() {
-		return this.powerUp === this.powerUpTime;
-	};
 }
+
+RedAlert.Weapon.prototype.fire = function() {
+	this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], 12, 10, [0]);
+	var self = this;
+	radio('shotfinished').subscribe(function() {
+		self.target = null;
+		self.sprite = null;
+	});
+};
+
+RedAlert.Weapon.prototype.update = function(dt) {
+	if(this.powerUp != this.powerUpTime) {
+	
+		if(this.powerUp + dt > this.powerUpTime) {
+			this.powerUp = this.powerUpTime;
+			radio('weaponcharged').broadcast(this);
+		}			
+		else if(this.powerUp + dt < this.powerUpTime){
+			this.powerUp += dt;
+		}
+}
+	if(this.sprite != null) {
+		this.sprite.update(dt);
+	}
+};
+
+RedAlert.Weapon.prototype.isPowered = function() {
+	return this.powerUp === this.powerUpTime;
+};
 
 RedAlert.LaserWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
-	this.spriteImg = 'images/ship/laserbullet.png';
 	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
+	this.spriteImg = 'images/ship/laserbullet.png';
+	
 }
 
-RedAlert.LaserWeapon.prototype = RedAlert.Weapon;
+RedAlert.LaserWeapon.prototype = new RedAlert.Weapon();
 RedAlert.LaserWeapon.prototype.constructor = RedAlert.LaserWeapon;
 
 RedAlert.MissileWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
+	this.spriteImg = 'images/ship/laserbullet.png';
 }
 
-RedAlert.MissileWeapon.prototype = RedAlert.Weapon;
+RedAlert.MissileWeapon.prototype = new RedAlert.Weapon();
 RedAlert.MissileWeapon.prototype.constructor = RedAlert.MissileWeapon;
 
 RedAlert.ShipBackground = function() {
@@ -182,6 +201,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 	
 				});
 				left += weaponSlotSize.x;
+				
+				
 			}
 		}
 		
@@ -196,12 +217,17 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 				}
 			}
 		}
-		
+		radio('weaponcharged').subscribe(function(weapon) {
+			weapon.fire();
+		});
 	};
 	
 	var lockTarget = function(x, y) {
 		var p = {x: x, y: y};
 		this.activeWeapon.target = p;
+		if(this.activeWeapon.isPowered()) {
+			radio('weaponcharged').broadcast(this.activeWeapon);
+		}
 	};
 	
 	var setCrosshair = function(x, y, friendShip) {
@@ -212,8 +238,10 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			var slot = weaponSlots[i];
 			if(slot.selected) {
 				this.crosshairs[i] = p;
+				pane.canvas().style.cursor = "default";
+				break;
 			}
-						
+
 		}
 	}
 	
@@ -243,7 +271,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			}
 			else {
 				weapon.selected = false;
-				//pane.canvas().style.cursor = "pointer";
+				
 			}
 			x += weaponSlotSize.x;
 		}
@@ -305,11 +333,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		var slots = activeWeaponSlots();
 		for(var i = 0; i < slots.length; i++) {
 			var weapon = slots[i];
-			weapon.powerUp += dt;
-			if(weapon.powerUp >= weapon.powerUpTime) {
-				weapon.powerUp = weapon.powerUpTime;
-				radio('weaponcharged').broadcast(weapon);
-			}			
+			weapon.update(dt);
 		}
 	};
 	
@@ -371,6 +395,10 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		}
 	};
 	
+	var getWeaponPosition = function() {
+		return weaponPosition;
+	};
+	
 	return extend(pane, {
 		drawWeapon: drawWeapon,
 		setWeaponLabel: setWeaponLabel,
@@ -389,7 +417,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		onWeaponSlotClicked: onWeaponSlotClicked,
 		lockTarget: lockTarget,
 		setCrosshair: setCrosshair,
-		getWeaponSlotLocation: getWeaponSlotLocation
+		getWeaponSlotLocation: getWeaponSlotLocation,
+		getWeaponPosition:getWeaponPosition
 	});	
 };
 
