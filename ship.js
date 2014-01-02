@@ -340,52 +340,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		
 	};
 	
-	/*var setWeaponLabel = function(top, left, label) {
-		
-		var lines = label.split(' ');
-		var x = left + 20, y = top + 15;
-		var ctx = pane.context();
-		ctx.font = '14px Calibri bold';
-		ctx.strokeStyle = '#000';
-		ctx.lineWidth = 0.5;
-		for(var i = 0; i < lines.length; i++) {
-			var line = lines[i];
-			ctx.fillText(line, x, y);
-			
-			y += 15;
-		}
-
-	};*/
 	
-	/*var drawWeapon = function(weapon, barMax, top, left) {
-		var barHeight = weapon.powerUpTime / barMax; 
-		var context = pane.context();
-		var style = weapon.isPowered() ? '#0f0' : '#fff';
-		
-		context.beginPath();
-		context.strokeStyle = style;
-		context.lineWidth = 2;
-		context.rect(left, top + (weaponSlotSize.y * (1 - barHeight)), 5, barHeight * weaponSlotSize.y);
-		context.stroke();
-		
-		barHeight = weapon.powerUp / barMax;
-		
-		context.beginPath();
-		context.fillStyle = style;
-		context.rect(left, top + (weaponSlotSize.y * (1 - barHeight)), 5, barHeight * weaponSlotSize.y);
-		context.fill();
-		
-		setWeaponLabel(top, left, weapon.label, 10);
-		
-		if(weapon.selected) {
-			context.beginPath();
-			context.strokeStyle = 'orange';
-			context.lineWidth = 2;
-			context.rect(left, top, weaponSlotSize.x - 1, weaponSlotSize.y);
-			context.stroke();
-		}
-		
-	};*/
 	
 	var activeWeaponSlots = function() {
 		return weaponSlots.filter(function(val) {return val != null;});
