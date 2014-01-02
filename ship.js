@@ -8,12 +8,15 @@ RedAlert.Weapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	this.powerUp = 0;
 	this.selected = false;
 	this.target = null;
-	this.sprite = null;
-	this.spriteImg = '';
+	this.bullet = null;
+	this.bulletImg = '';
 }
 
 RedAlert.Weapon.prototype.fire = function() {
-	this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], [12, 12], 10, [0]);
+	//this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], [12, 12], 10);
+	this.bullet = {x: this.ship.getWeaponPosition().x, y: this.ship.getWeaponPosition().y};
+	
+	
 	var self = this;
 	radio('shotfinished').subscribe(function() {
 		self.target = null;
@@ -33,8 +36,8 @@ RedAlert.Weapon.prototype.update = function(dt) {
 		}
 	}
 	
-	if(this.sprite != null) {
-		this.sprite.update(dt);
+	if(this.bullet != null) {
+		this.bullet.x += 100 * dt;
 	}
 }
 
@@ -65,10 +68,11 @@ RedAlert.Weapon.prototype.draw = function(barMax, top, left) {
 		context.rect(left, top, this.ship.weaponSlotSize.x - 1, this.ship.weaponSlotSize.y);
 		context.stroke();
 	}
-
-	if(this.sprite != null) {
-		this.sprite.render();
+	
+	if(this.bullet != null) {
+		context.drawImage(resources.get(this.bulletImg), this.bullet.x, this.bullet.y); 
 	}
+
 }
 
 RedAlert.Weapon.prototype.setWeaponLabel = function(top, left, label) {
@@ -91,7 +95,7 @@ RedAlert.Weapon.prototype.isPowered = function() {
 
 RedAlert.LaserWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
-	this.spriteImg = 'images/ship/laserbullet.png';
+	this.bulletImg = 'images/ship/laserbullet.png';
 	
 }
 
@@ -100,15 +104,17 @@ RedAlert.LaserWeapon.prototype.constructor = RedAlert.LaserWeapon;
 
 RedAlert.MissileWeapon = function(ship, powerConsumption, powerUpTime, damage, label) {
 	RedAlert.Weapon.call(this, ship, powerConsumption, powerUpTime, damage, label);
-	this.spriteImg = 'images/ship/laserbullet.png';
+	this.bulletImg = 'images/ship/laserbullet.png';
 }
 
 RedAlert.MissileWeapon.prototype = new RedAlert.Weapon();
 RedAlert.MissileWeapon.prototype.constructor = RedAlert.MissileWeapon;
 
 RedAlert.ShipBackground = function() {
-	var draw = function() {
-		var pane = RedAlert.Pane();
+	var canvasData = null;
+	var pane = RedAlert.Pane();
+	
+	var init = function() {
 		var ctx = pane.context();
 		var canvasSize = pane.canvasSize();
 		var number = Math.random() * 50 + 50;
@@ -118,7 +124,7 @@ RedAlert.ShipBackground = function() {
 		ctx.fillStyle = '#000';
 		ctx.rect(0, 0, canvasSize.width, canvasSize.height);
 		ctx.fill();
-		var canvasData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+		canvasData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
 		
 		for(var i = 0; i < number; i++) {
 			var x = Math.floor(Math.random() * canvasSize.width);
@@ -131,12 +137,19 @@ RedAlert.ShipBackground = function() {
 			canvasData.data[index + 3] = Math.floor(Math.random() * 255);
 			
 		}
+		
+	
+	};
+	
+	var draw = function() {
+		var ctx = pane.context();
 		ctx.putImageData(canvasData, 0, 0);
 	}
 	
 	
 	return {
-		draw: draw
+		draw: draw,
+		init: init
 	};
 }
 
@@ -473,6 +486,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 RedAlert.Battle = function() {
 	var lastTime;
 
+	var background = RedAlert.ShipBackground();
+	
 	var handlers = RedAlert.ClickHandlers();
 	
 	var playerShip = RedAlert.Ship(handlers, 0,  {x: 50, y: 150});
@@ -481,8 +496,8 @@ RedAlert.Battle = function() {
 	
 	
 	var init = function() {
-		var background = RedAlert.ShipBackground();
-		background.draw();
+		
+		background.init();
 		var playerLayout = [
 			'xxxddxxt',
 			'dh w----',
@@ -521,6 +536,7 @@ RedAlert.Battle = function() {
 	}
 	
 	var render = function() {
+		background.draw();
 		playerShip.draw();
 		enemyShip.draw();
 	};
