@@ -41,10 +41,6 @@ RedAlert.Weapon.prototype.fire = function() {
 	//this.sprite = new Sprite(this.spriteImg, [this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y], [12, 12], 10);
 	var bullet = new RedAlert.Bullet(this, new RedAlert.Point(this.ship.getWeaponPosition().x, this.ship.getWeaponPosition().y));
 	this.powerUp = 0;
-	var self = this;
-	radio('shotfinished').subscribe(function() {
-		self.target = null;
-	});
 	
 	return bullet;
 };
@@ -169,10 +165,10 @@ RedAlert.ShipBackground = function() {
 }
 
 
-RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
+RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset) {
 	var pane = RedAlert.Pane();
 	
-	var hullState = 100;
+	var maxHullState, hullState = maxHullState = inHullState;
 	
 	var weaponSlotSize = {x: 75, y: 50};
 	var weaponSlotCapacity = 4;
@@ -255,6 +251,35 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 			}
 		}
 	}
+	
+	var HealthBar = function(position) {
+		var ctx = pane.context();
+		
+		this.draw = function() {
+			ctx.beginPath();
+			ctx.strokeStyle = 'yellow';
+			for(var i = 0; i < maxHullState; i++) {
+				ctx.rect(position.x + i * 15, position.y, 15, 15 );
+			}
+			ctx.stroke();
+			
+			ctx.beginPath();
+			for(var i = 0; i < hullState; i++) {
+				if(i > Math.floor(maxHullState * 3 / 4)) {
+					ctx.fillStyle = 'green';
+				}
+				else if(i > Math.floor(maxHullState * 1 / 4)) {
+					ctx.fillStyle = 'orange';
+				}
+				else {
+					ctx.fillStyle = 'red';
+				}
+				ctx.rect(position.x + 1 + i * 15, position.y + 1, 14, 14 );
+				ctx.fill();
+			}
+			
+		}
+	};
 
 	var tiles = [];
 	var context = document.getElementById('gameWindow').getContext("2d");
@@ -268,8 +293,11 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 	
 	var bullets = [];
 	
-	var init = function(newLayout, weapons) {
+	var healthBar = null;
+	
+	var init = function(newLayout, weapons, healthBarPosition) {
 		layout = newLayout;
+		healthBar = new HealthBar(healthBarPosition);
 		var top = pane.canvasSize().height - drawingOffset.y;
 		var left = drawingOffset.x;;
 		for(var i = 0; i < weapons.length; i++) {
@@ -374,7 +402,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 		var top = pane.canvasSize().height - drawingOffset.y;
 		var left = drawingOffset.x
 		
-		return {x: top, y: left + slotIndex * weaponSlotSize.x};
+		return new RedAlert.Point(top, left + slotIndex * weaponSlotSize.x);
 	}
 	
 	var draw = function() {
@@ -425,6 +453,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inDrawingOffset) {
 				}
 			}
 		}
+		
+		healthBar.draw();
 	};
 	
 	var getWeaponPosition = function() {
@@ -467,9 +497,9 @@ RedAlert.Battle = function() {
 	
 	var handlers = RedAlert.ClickHandlers();
 	
-	var playerShip = RedAlert.Ship(handlers, 0,  {x: 50, y: 150});
+	var playerShip = RedAlert.Ship(handlers, 0, 30, new RedAlert.Point(50, 150));
 	
-	var enemyShip = RedAlert.Ship(handlers, 1,  {x: 750, y: 50});
+	var enemyShip = RedAlert.Ship(handlers, 1, 10, new RedAlert.Point(750, 50));
 	
 	var canvasSize = pane.canvasSize();
 	
@@ -488,7 +518,7 @@ RedAlert.Battle = function() {
 		];
 		var playerWeapons = [new RedAlert.MissileWeapon(playerShip, 1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(playerShip, 2, 13, 3, 'Light Laser Cannon')];
 		
-		playerShip.init(playerLayout, playerWeapons);
+		playerShip.init(playerLayout, playerWeapons, new RedAlert.Point(50, 600));
 		playerShip.draw();
 		
 		var enemyLayout = [
@@ -501,7 +531,7 @@ RedAlert.Battle = function() {
 		];
 		var enemyWeapons = [new RedAlert.MissileWeapon(enemyShip, 1, 10, 2, 'Archer Missile Launcher'), new RedAlert.LaserWeapon(enemyShip, 2, 13, 3, 'Light Laser Cannon')];
 		
-		enemyShip.init(enemyLayout, enemyWeapons);
+		enemyShip.init(enemyLayout, enemyWeapons, new RedAlert.Point(750, 10));
 		enemyShip.draw();
 		
 		radio('weaponslotclicked').subscribe([playerShip.onWeaponSlotClicked, playerShip]);
@@ -532,6 +562,7 @@ RedAlert.Battle = function() {
 			if(bullet.position.getDistance(bullet.weapon.target) < 50) {
 				bullet.weapon.target = null;
 				playerShip.bullets.remove(i);
+				enemyShip.hullState -= 2;
 			}
 		}
 	
