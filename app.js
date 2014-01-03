@@ -10,7 +10,8 @@ resources.load([
 	'images/ship/hangar.png',
 	'images/ship/door.png',
 	'images/ship/crosshair.png',
-	'images/ship/laserbullet.png'
+	'images/ship/laserbullet.png',
+	'images/ship/explosion-animation.png'
 ])
 
 resources.onReady(function() {

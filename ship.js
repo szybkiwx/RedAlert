@@ -465,6 +465,29 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		return bullets;
 	};
 	
+	var damage = function(amnt) {
+		if(hullState - amnt >= 0) {
+			hullState-= amnt;
+		}
+		else {
+			hullState = 0;
+		}
+	};
+	
+	var explosion = function(x, y) {
+		for(var i = 0; i < tiles.length; i++) {
+			var tile = tiles[i];
+			if(x >= tile.position.x && x < tile.position.x + tileSize.x
+				&& y >= tile.position.y && y < tile.position.y + tileSize.y) {
+				//var ctx = pane.context();
+				//ctx.beginPath();
+				//ctx.drawImage(resources.get('images/ship/explosion-animation.png'), tile.position.x, tile.position.y);
+				var sprite = new Sprite('images/ship/explosion-animation.png', [tile.position.x, tile.position.y], [20, 20]
+			}
+			
+		}
+	}
+	
 	return extend(pane, {
 		activeWeaponSlots: activeWeaponSlots,
 		weaponPosition: weaponPosition,
@@ -483,7 +506,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		setCrosshair: setCrosshair,
 		getWeaponSlotLocation: getWeaponSlotLocation,
 		getWeaponPosition: getWeaponPosition,
-		getBullets: getBullets
+		getBullets: getBullets,
+		applyDamage: damage
 	});	
 };
 
@@ -562,7 +586,8 @@ RedAlert.Battle = function() {
 			if(bullet.position.getDistance(bullet.weapon.target) < 50) {
 				bullet.weapon.target = null;
 				playerShip.bullets.remove(i);
-				enemyShip.hullState -= 2;
+				enemyShip.applyDamage(bullet.weapon.damage);
+				
 			}
 		}
 	
