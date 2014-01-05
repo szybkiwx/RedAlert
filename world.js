@@ -42,6 +42,16 @@ RedAlert.Point = function(px, py) {
 	};
 };
 
+RedAlert.Rectangle = function(point, width, height) {
+	this.point = point;
+	this.width = width;
+	this.height = height;
+	
+	this.pointIn = function(point) {
+		return point.x >= this.point.x && point.x < this.point.x + this.width &&
+				point.y >= this.point.y && point.y < this.point.y + this.height;
+	}
+}
 
 RedAlert.Layout = RedAlert.Layout || function(gridSize, baconsQuantity, inSide, outSides) {
 

@@ -200,10 +200,13 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 	};
 	
 	var Tile = function(ship, /*Point*/position, symbol){
+		
 		this.position = position;
 		this.symbol = symbol;
 		this.ship = ship;
 		var finalPosition = this.getPosition();
+		
+		RedAlert.Rectangle.call(this, new RedAlert.Point(finalPosition.x, finalPosition.y), finalPosition.sizex, finalPosition.sizey); 
 		var self = this;
 		
 		handlers.registerRect(finalPosition.x, finalPosition.y, finalPosition.sizex, finalPosition.sizey, function(x, y) {
@@ -213,6 +216,9 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		});
 	};
 
+	Tile.prototype = new RedAlert.Rectangle();
+	Tile.prototype.constructor = Tile;
+	
 	Tile.prototype.getPosition = function() {
 		return { 
 			x: (this.ship.orientation == 0 ? this.position.x : this.position.y) + drawingOffset.x,
@@ -246,11 +252,28 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 				var crosshair = this.ship.crosshairs[i];
 				if(crosshair !== null && crosshair.x >= finalPosition.x && crosshair.x < finalPosition.x + finalPosition.sizex 
 					&& crosshair.y >= finalPosition.y && crosshair.y < finalPosition.y + finalPosition.sizey ) {
+					
 					pane.context().drawImage(resources.get('images/ship/crosshair.png'), finalPosition.x, finalPosition.y)
 				}				
 			}
 		}
 	}
+	
+	var WeaponSlot = function(point, width, height) {
+		RedAlert.Rectangle.call(this, point, width, height);
+		this.weapon = null;
+	};
+	
+	WeaponSlot.prototype = new RedAlert.Rectangle();
+	WeaponSlot.prototype.constructor = WeaponSlot;
+	
+	WeaponSlot.prototype.registerClick = function() {
+		handlers.registerRect(this.point.x, this.point.y, this.width, this.height, function(x, y) {
+			radio('weaponslotclicked').broadcast(x, y);
+
+		});
+		
+	};
 	
 	var HealthBar = function(position) {
 		var ctx = pane.context();
@@ -301,18 +324,18 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		layout = newLayout;
 		healthBar = new HealthBar(healthBarPosition);
 		var top = pane.canvasSize().height - drawingOffset.y;
-		var left = drawingOffset.x;;
-		for(var i = 0; i < weapons.length; i++) {
-			weaponSlots[i] = weapons[i];
-			if(orientation === 0) {
-				handlers.registerRect(left, top, weaponSlotSize.x, weaponSlotSize.y, function(x, y) {
-					radio('weaponslotclicked').broadcast(x, y);
-	
-				});
-				left += weaponSlotSize.x;
-				
-				
+		var left = drawingOffset.x;
+		
+		for(var i = 0; i < weaponSlotCapacity; i++) {
+			weaponSlots[i] = new WeaponSlot(new RedAlert.Point(left, top), weaponSlotSize.x, weaponSlotSize.y);
+			if(i < weapons.length) {
+				weaponSlots[i].weapon = weapons[i];
+				if(orientation === 0) {
+					weaponSlots[i].registerClick();
+				}
 			}
+			
+			left += weaponSlotSize.x;
 		}
 		
 		for(var i = 0; i < layout.length; i ++) {
@@ -347,12 +370,23 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		var p = new RedAlert.Point(x, y);
 		for(var i = 0; i < weaponSlots.length; i++) {
 			var slot = weaponSlots[i];
-			if(slot.selected) {
+			if(slot.weapon.selected) {
 				this.crosshairs[i] = p;
 				pane.canvas().style.cursor = "default";
 				break;
 			}
 
+		}
+	}
+	
+	var clearCrosshair = function(point) {
+		var weaponSlots = friendShip.activeWeaponSlots();
+		for(var i = weaponSlots.length - 1; i >= 0 ; i--) {
+			var weapon = weaponSlots[i];
+			if(weapon.target.equals(this.crosshairs[i])) {
+				this.crosshairs.remove(i);
+				break;
+			}
 		}
 	}
 	
@@ -370,33 +404,30 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 	var onWeaponSlotClicked = function(clickX, clickY) {
 
 		var weapons = this.activeWeaponSlots();
-		var y = this.canvasSize().height - this.drawingOffset.y;
-		var x = this.drawingOffset.x;
-		
+
 		for(var i = 0; i < weapons.length; i++) {
-			var weapon = weapons[i];
-			if(clickX >= x && clickX < x + this.weaponSlotSize.x && clickY >= y && clickY < y + this.weaponSlotSize.y){
-				weapon.selected = true;
-				this.activeWeapon = weapon;
+			var slot = weapons[i];
+			if(slot.pointIn(new RedAlert.Point(clickX, clickY))) {
+				slot.weapon.selected = true;
+				this.activeWeapon = slot.weapon;
 				this.canvas().style.cursor = "url('images/ship/crosshair.png'), auto";
 			}
 			else {
-				weapon.selected = false;
+				slot.weapon.selected = false;
 				
 			}
-			x += weaponSlotSize.x;
 		}
 	};
 	
 	var activeWeaponSlots = function() {
-		return weaponSlots.filter(function(val) {return val != null;});
+		return weaponSlots.filter(function(val) {return val.weapon != null;});
 	};
 	
 	var update = function(dt) {
 		var slots = activeWeaponSlots();
 		for(var i = 0; i < slots.length; i++) {
-			var weapon = slots[i];
-			weapon.update(dt);
+			var slot = slots[i];
+			slot.weapon.update(dt);
 		}
 		
 		for(var i = explosions.length - 1; i >= 0 ; i--) {
@@ -429,7 +460,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 			if(tile.symbol in tileConfigs ) {
 				var scalex = 1, scaley = 1;
 				if("size" in tileConfigs[tile.symbol]) {
-					scalex = tileConfigs[tile.symbol].size.w;
+					scalex = tileConfigs[tile.symbol]. size.w;
 					scaley = tileConfigs[tile.symbol].size.h;
 					if(orientation == 1) {
 						scaley = [scalex, scalex = scaley][0];
@@ -448,18 +479,18 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		
 		if (orientation === 0) {
 			var maxWeaponPowerBar = weaponSlots.reduce(function(lastValue, current) { 
-				if(current == null) {
+				if(current.weapon == null) {
 					return lastValue;
 				}			
-				return Math.max(lastValue, current.powerUpTime)
+				return Math.max(lastValue, current.weapon.powerUpTime)
 			}, 0);
 			
 			for(var i  = 0; i < weaponSlots.length; i++) {
 				var pos = getWeaponSlotLocation(i);
 				drawWeaponSlot(pos.x, pos.y );
-				var weapon = weaponSlots[i];
-				if(weapon != null) {
-					weapon.draw(maxWeaponPowerBar, pos.x, pos.y);
+				var slot = weaponSlots[i];
+				if(slot.weapon != null) {
+					slot.weapon.draw(maxWeaponPowerBar, pos.x, pos.y);
 				}
 			}
 		}
@@ -609,11 +640,13 @@ RedAlert.Battle = function() {
 			}
 			
 			//shot reached destination
-			if(bullet.position.getDistance(bullet.weapon.target) < 50) {
+			if(bullet.position.getDistance(bullet.weapon.target) < 10) {
+				var target = bullet.weapon.target;
 				bullet.weapon.target = null;
 				playerShip.bullets.remove(i);
 				enemyShip.applyDamage(bullet.weapon.damage);
-				enemyShip.explosion(bullet.position);
+				enemyShip.explosion(target);
+				playerShip.activeWeapon = null;
 				
 			}
 		}
