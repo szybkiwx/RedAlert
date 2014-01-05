@@ -34,7 +34,7 @@ RedAlert.Point = function(px, py) {
 		var dx = p2.x - this.x;
 		var dy = p2.y - this.y;
 		
-		return Math.abs(dx * dx + dy * dy);
+		return Math.sqrt(dx * dx + dy * dy);
 	};
 	
 	this.equals = function(p2) {

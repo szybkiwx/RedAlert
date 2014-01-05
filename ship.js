@@ -295,6 +295,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 	
 	var healthBar = null;
 	
+	var explosions = [];
+	
 	var init = function(newLayout, weapons, healthBarPosition) {
 		layout = newLayout;
 		healthBar = new HealthBar(healthBarPosition);
@@ -355,7 +357,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 	}
 	
 	var drawWeaponSlot = function(top, left) {
-		var context = pane.context();
+		//var context = pane.context();
 		context.beginPath();
 		context.rect(left, top, weaponSlotSize.x, weaponSlotSize.y);
 		context.fillStyle = '#000';//'#D8D8D8';
@@ -395,6 +397,14 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		for(var i = 0; i < slots.length; i++) {
 			var weapon = slots[i];
 			weapon.update(dt);
+		}
+		
+		for(var i = explosions.length - 1; i >= 0 ; i--) {
+			var sprite = explosions[i].sprite;
+			sprite.update(dt);
+			if(sprite.done === true) {
+				explosions.remove(i);
+			}
 		}
 	};
 	
@@ -455,6 +465,14 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		}
 		
 		healthBar.draw();
+		for(var i = 0; i < explosions.length; i++) {
+			context.save();
+			var x = explosions[i].position.x, y = explosions[i].position.y;
+			
+			context.translate(x, y);
+			explosions[i].sprite.render(context);
+			context.restore();
+		}
 	};
 	
 	var getWeaponPosition = function() {
@@ -474,15 +492,22 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		}
 	};
 	
-	var explosion = function(x, y) {
+	var explosion = function(hitPosition) {
+		var x = hitPosition.x, y = hitPosition.y;
 		for(var i = 0; i < tiles.length; i++) {
 			var tile = tiles[i];
-			if(x >= tile.position.x && x < tile.position.x + tileSize.x
-				&& y >= tile.position.y && y < tile.position.y + tileSize.y) {
-				//var ctx = pane.context();
-				//ctx.beginPath();
-				//ctx.drawImage(resources.get('images/ship/explosion-animation.png'), tile.position.x, tile.position.y);
-				var sprite = new Sprite('images/ship/explosion-animation.png', [tile.position.x, tile.position.y], [20, 20]
+			var position = tile.getPosition();
+			if(x >= position.x && x < position.x + tileSize.x
+				&& y >= position.y && y < position.y + tileSize.y) {
+				var sprite = new Sprite('images/ship/explosion-animation.png', 
+					[0, 0],
+					[20, 20], 
+					10, 
+					[0, 1, 2, 3, 4, 5, 6, 7],
+					'horizontal',
+					true);
+				explosions.push({ sprite: sprite, position: new RedAlert.Point(position.x, position.y)});
+				break;
 			}
 			
 		}
@@ -507,7 +532,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		getWeaponSlotLocation: getWeaponSlotLocation,
 		getWeaponPosition: getWeaponPosition,
 		getBullets: getBullets,
-		applyDamage: damage
+		applyDamage: damage,
+		explosion: explosion
 	});	
 };
 
@@ -587,6 +613,7 @@ RedAlert.Battle = function() {
 				bullet.weapon.target = null;
 				playerShip.bullets.remove(i);
 				enemyShip.applyDamage(bullet.weapon.damage);
+				enemyShip.explosion(bullet.position);
 				
 			}
 		}
