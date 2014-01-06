@@ -59,7 +59,7 @@ RedAlert.Weapon.prototype.update = function(dt) {
 	
 }
 
-RedAlert.Weapon.prototype.draw = function(barMax, top, left) {
+RedAlert.Weapon.prototype.draw = function(barMax, left, top) {
 	var barHeight = this.powerUpTime / barMax; 
 	var context = this.ship.context();
 	var style = this.isPowered() ? '#0f0' : '#fff';
@@ -210,6 +210,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		var self = this;
 		
 		handlers.registerRect(finalPosition.x, finalPosition.y, finalPosition.sizex, finalPosition.sizey, function(x, y) {
+			
 			if(self.ship.orientation === 1) {
 				radio('tileclicked').broadcast(x, y);
 			}
@@ -230,11 +231,10 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 	
 	Tile.prototype.draw = function() {
 		var context = pane.context();
-		var finalPosition = this.getPosition();
 		
 		context.beginPath();
 		
-		context.rect(finalPosition.x, finalPosition.y, finalPosition.sizex - 2, finalPosition.sizey - 2);
+		context.rect(this.point.x, this.point.y, this.width - 2, this.height - 2);
 		context.fillStyle = '#D8D8D8';
 		context.fill();
 		context.strokeStyle = '#9E9E9E';
@@ -244,16 +244,14 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		context.fillStyle = '#6E6E6E';
 		context.font = '24px Calibri';
 		if(this.symbol in tileConfigs) {
-			context.drawImage(tileConfigs[this.symbol].img, finalPosition.x + 5, finalPosition.y + 5);
+			context.drawImage(tileConfigs[this.symbol].img, this.point.x + 5, this.point.y + 5);
 		}
 	
 		if(this.ship.orientation === 1) {
 			for(var i = 0; i < this.ship.crosshairs.length; i++) {
 				var crosshair = this.ship.crosshairs[i];
-				if(crosshair !== null && crosshair.x >= finalPosition.x && crosshair.x < finalPosition.x + finalPosition.sizex 
-					&& crosshair.y >= finalPosition.y && crosshair.y < finalPosition.y + finalPosition.sizey ) {
-					
-					pane.context().drawImage(resources.get('images/ship/crosshair.png'), finalPosition.x, finalPosition.y)
+				if(crosshair !== null && this.pointIn(crosshair)) {
+					pane.context().drawImage(resources.get('images/ship/crosshair.png'), this.point.x, this.point.y)
 				}				
 			}
 		}
@@ -273,6 +271,16 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 
 		});
 		
+	};
+	
+	WeaponSlot.prototype.draw = function() {
+		context.beginPath();
+		context.rect(this.point.x, this.point.y, this.width, this.height);
+		context.fillStyle = '#000';//'#D8D8D8';
+		context.strokeStyle = '#2E2E2E';
+		context.lineWidth = 1;
+		context.fill();
+		context.stroke();
 	};
 	
 	var HealthBar = function(position) {
@@ -364,8 +372,8 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		}
 	};
 	
-	var setCrosshair = function(x, y, friendShip) {
-		var weaponSlots = friendShip.activeWeaponSlots();
+	var setCrosshair = function(x, y, otherShip) {
+		var weaponSlots = otherShip.activeWeaponSlots();
 		
 		var p = new RedAlert.Point(x, y);
 		for(var i = 0; i < weaponSlots.length; i++) {
@@ -378,29 +386,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 
 		}
 	}
-	
-	var clearCrosshair = function(point) {
-		var weaponSlots = friendShip.activeWeaponSlots();
-		for(var i = weaponSlots.length - 1; i >= 0 ; i--) {
-			var weapon = weaponSlots[i];
-			if(weapon.target.equals(this.crosshairs[i])) {
-				this.crosshairs.remove(i);
-				break;
-			}
-		}
-	}
-	
-	var drawWeaponSlot = function(top, left) {
-		//var context = pane.context();
-		context.beginPath();
-		context.rect(left, top, weaponSlotSize.x, weaponSlotSize.y);
-		context.fillStyle = '#000';//'#D8D8D8';
-		context.strokeStyle = '#2E2E2E';
-		context.lineWidth = 1;
-		context.fill();
-		context.stroke();
-	}
-	
+
 	var onWeaponSlotClicked = function(clickX, clickY) {
 
 		var weapons = this.activeWeaponSlots();
@@ -410,17 +396,18 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 			if(slot.pointIn(new RedAlert.Point(clickX, clickY))) {
 				slot.weapon.selected = true;
 				this.activeWeapon = slot.weapon;
-				this.canvas().style.cursor = "url('images/ship/crosshair.png'), auto";
+				this.canvas().style.cursor = "url('images/ship/crosshair.png') 12 12, auto";
 			}
 			else {
 				slot.weapon.selected = false;
-				
 			}
 		}
 	};
 	
 	var activeWeaponSlots = function() {
-		return weaponSlots.filter(function(val) {return val.weapon != null;});
+		return weaponSlots.filter(function(val) {
+			return val.weapon != null;
+		});
 	};
 	
 	var update = function(dt) {
@@ -486,11 +473,12 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 			}, 0);
 			
 			for(var i  = 0; i < weaponSlots.length; i++) {
-				var pos = getWeaponSlotLocation(i);
-				drawWeaponSlot(pos.x, pos.y );
+				//var pos = getWeaponSlotLocation(i);
+				//drawWeaponSlot(pos.x, pos.y );
 				var slot = weaponSlots[i];
+				slot.draw();
 				if(slot.weapon != null) {
-					slot.weapon.draw(maxWeaponPowerBar, pos.x, pos.y);
+					slot.weapon.draw(maxWeaponPowerBar, slot.point.x, slot.point.y);
 				}
 			}
 		}
@@ -527,9 +515,7 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 		var x = hitPosition.x, y = hitPosition.y;
 		for(var i = 0; i < tiles.length; i++) {
 			var tile = tiles[i];
-			var position = tile.getPosition();
-			if(x >= position.x && x < position.x + tileSize.x
-				&& y >= position.y && y < position.y + tileSize.y) {
+			if(tile.pointIn(hitPosition)) {
 				var sprite = new Sprite('images/ship/explosion-animation.png', 
 					[0, 0],
 					[20, 20], 
@@ -537,14 +523,24 @@ RedAlert.Ship = function(inHandlers, inOrientation, inHullState, inDrawingOffset
 					[0, 1, 2, 3, 4, 5, 6, 7],
 					'horizontal',
 					true);
-				explosions.push({ sprite: sprite, position: new RedAlert.Point(position.x, position.y)});
+				explosions.push({ sprite: sprite, position: tile.point});
 				break;
 			}
 			
 		}
 	}
 	
+	var debug = function() {
+		for(var i = 0; i < tiles.length; i++) {
+			var tile = tiles[i];
+			var debug = document.getElementById('debug');
+			var li = document.createElement('li');
+			li.innerHTML = "x: "+ tile.point.x+", y: "+tile.point.y;
+			debug.appendChild(li);
+		}
+	};
 	return extend(pane, {
+		debug: debug,
 		activeWeaponSlots: activeWeaponSlots,
 		weaponPosition: weaponPosition,
 		crosshairs: crosshairs,
@@ -614,7 +610,7 @@ RedAlert.Battle = function() {
 		
 		enemyShip.init(enemyLayout, enemyWeapons, new RedAlert.Point(750, 10));
 		enemyShip.draw();
-		
+		enemyShip.debug();
 		radio('weaponslotclicked').subscribe([playerShip.onWeaponSlotClicked, playerShip]);
 		radio('tileclicked').subscribe([playerShip.lockTarget, playerShip]);
 		radio('tileclicked').subscribe([function(x, y) { enemyShip.setCrosshair(x, y, playerShip)}, enemyShip]);

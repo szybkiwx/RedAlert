@@ -1,3 +1,7 @@
 #gameWindow {
-	cursor: url(images/ship/crosshair.png)
+	cursor: url(images/ship/crosshair.png);
+	float: left;
+}
+#statsDebug {
+	float: left;
 }
